@@ -1,0 +1,68 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MAL-Map
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: svelte/package-lock.json
+
+      - name: Install Svelte Dependencies
+        run: npm ci
+        working-directory: ./svelte
+
+      - name: Build Webpack Bundle
+        run: npm run build
+        working-directory: ./svelte
+
+      - name: Deploy to gh-pages branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: svelte/public
+          clean: true
+
+      - name: Update Astro Personal Site
+        env:
+          ASTRO_DEPLOY_KEY: ${{ secrets.ASTRO_DEPLOY_KEY }}
+        run: |
+          if [ -n "$ASTRO_DEPLOY_KEY" ]; then
+            echo "Syncing bundles directly to astroPersonal..."
+            mkdir -p ~/.ssh
+            echo "$ASTRO_DEPLOY_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+            git clone git@github.com:SamPom100/astroPersonal.git /tmp/astroPersonal
+            cp svelte/public/build/bundle.js /tmp/astroPersonal/public/malmap/bundle.js
+            cp svelte/public/build/bundle.css /tmp/astroPersonal/public/malmap/bundle.css
+            cd /tmp/astroPersonal
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add public/malmap/
+            if git commit -m "chore(malmap): auto-sync bundle from MAL-Map [skip ci]"; then
+              git push origin main
+            fi
+          else
+            echo "ASTRO_DEPLOY_KEY not set. GitHub Pages deployment completed."
+          fi
