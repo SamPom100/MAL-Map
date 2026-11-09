@@ -70354,7 +70354,8 @@ function Canvas_svelte_instance($$self, $$props, $$invalidate) {
                 clusterContainer.addChild(groupContainer);
                 clusterVisualsByHue[hue.toFixed(2)] = {
                   container: groupContainer,
-                  lastTriggerTime: 0
+                  lastTriggerTime: 0,
+                  isFadingIn: false
                 };
               };
 
@@ -70555,7 +70556,8 @@ function Canvas_svelte_instance($$self, $$props, $$invalidate) {
                   var _node2 = _step3.value;
                   _node2.label.visible = false;
                 } // Dynamic cluster highlighting:
-                // - Hover/selected trigger triggers a 5-second reveal: fade in (250ms), hold (5000ms), fade out (600ms).
+                // - Hover/selected trigger triggers a 5-second reveal.
+                // - If already visible in the same cluster, maintain visibility without resetting alpha/fade-in.
                 // - Pinned clusters via menu checkboxes stay permanently visible (alpha = 1.0).
 
               } catch (err) {
@@ -70568,9 +70570,18 @@ function Canvas_svelte_instance($$self, $$props, $$invalidate) {
               var activeHue = activeNode && typeof activeNode.hue === "number" ? (Math.round(activeNode.hue * 100) / 100).toFixed(2) : null;
               var now = Date.now();
 
-              if (activeHue !== null) {
-                if (clusterVisualsByHue[activeHue]) {
-                  clusterVisualsByHue[activeHue].lastTriggerTime = now;
+              if (activeHue !== null && clusterVisualsByHue[activeHue]) {
+                var item = clusterVisualsByHue[activeHue];
+                var elapsed = now - item.lastTriggerTime;
+
+                if (elapsed >= 5250 || item.lastTriggerTime === 0) {
+                  // Cluster was faded out or inactive: trigger a fresh fade-in
+                  item.lastTriggerTime = now;
+                  item.isFadingIn = true;
+                } else {
+                  // Cluster is already visible: extend timer to full hold without restarting fade-in
+                  item.lastTriggerTime = now - 250;
+                  item.isFadingIn = false;
                 }
               }
 
@@ -70579,33 +70590,41 @@ function Canvas_svelte_instance($$self, $$props, $$invalidate) {
               for (var _i = 0, _Object$entries = Object.entries(clusterVisualsByHue); _i < _Object$entries.length; _i++) {
                 var _Object$entries$_i = _slicedToArray(_Object$entries[_i], 2),
                     hueKey = _Object$entries$_i[0],
-                    item = _Object$entries$_i[1];
+                    _item = _Object$entries$_i[1];
 
                 var isPinned = pinnedClusterKeys.includes(hueKey);
 
                 if (isPinned) {
-                  item.container.visible = true;
-                  item.container.alpha = 1.0;
+                  _item.container.visible = true;
+                  _item.container.alpha = 1.0;
                   continue;
                 }
 
-                var elapsed = now - item.lastTriggerTime;
+                if (_item.lastTriggerTime === 0) {
+                  _item.container.visible = false;
+                  _item.container.alpha = 0;
+                  continue;
+                }
 
-                if (elapsed < 250) {
-                  // Fade in smoothly over 250ms
-                  item.container.visible = true;
-                  item.container.alpha = Math.max(0.01, elapsed / 250);
-                } else if (elapsed < 5250) {
-                  // Hold full visibility for 5 seconds
-                  item.container.visible = true;
-                  item.container.alpha = 1.0;
-                } else if (elapsed < 5850) {
-                  // Fade out smoothly over 600ms
-                  item.container.visible = true;
-                  item.container.alpha = Math.max(0, 1.0 - (elapsed - 5250) / 600);
+                var _elapsed = now - _item.lastTriggerTime;
+
+                if (_elapsed < 250 && _item.isFadingIn) {
+                  // Smooth initial fade in over 250ms
+                  _item.container.visible = true;
+                  _item.container.alpha = Math.max(0.01, _elapsed / 250);
+                } else if (_elapsed < 5250) {
+                  // Hold full visibility smoothly for 5 seconds
+                  _item.container.visible = true;
+                  _item.container.alpha = 1.0;
+                  _item.isFadingIn = false;
+                } else if (_elapsed < 5850) {
+                  // Smooth fade out over 600ms
+                  _item.container.visible = true;
+                  _item.container.alpha = Math.max(0, 1.0 - (_elapsed - 5250) / 600);
                 } else {
-                  item.container.visible = false;
-                  item.container.alpha = 0;
+                  _item.container.visible = false;
+                  _item.container.alpha = 0;
+                  _item.isFadingIn = false;
                 }
               }
 
