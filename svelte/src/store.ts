@@ -17,6 +17,8 @@ export const endYear: Writable<number> = writable(2025);
 export const distance: Writable<number> = writable(0);
 export const username: Writable<string> = writable("");
 export const selectedGenre: Writable<string> = writable("");
+export const selectedGenres: Writable<string[]> = writable([]);
+export const pinnedClusters: Writable<string[]> = writable([]);
 export const showClusterRegions: Writable<boolean> = writable(true);
 
 export const selected_anime: Writable<ANIME_DATA> = writable();

@@ -12,7 +12,7 @@
 	import { Cluster_Nodes } from "./ts/utils";
 	import { METADATA_DICT } from "./ts/base_types";
 	import { getClusterName } from "./ts/cluster_names";
-	import { showClusterRegions } from "./store";
+	import { pinnedClusters } from "./store";
 
 	let canvas: HTMLCanvasElement;
 	export let onInit: (
@@ -101,6 +101,17 @@
 		let nodes: Node[] = [];
 		let edges = [];
 		let line_container = new LineContainer(20);
+		let pinnedClusterKeys: string[] = [];
+		pinnedClusters.subscribe((keys) => {
+			pinnedClusterKeys = keys || [];
+		});
+
+		interface ClusterVisual {
+			container: Container;
+			lastTriggerTime: number;
+		}
+		let clusterVisualsByHue: { [hueKey: string]: ClusterVisual } = {};
+		let lastActiveHue: string | null = null;
 
 		viewport.on("clicked", (event) => {
 			if (FullNode.last_click_time > Date.now() - 200) {
@@ -138,6 +149,53 @@
 			const invisible_nodes = _.difference(nodes, vis_nodes);
 			for (const node of invisible_nodes) {
 				node.label.visible = false;
+			}
+
+			// Dynamic cluster highlighting:
+			// - Hover/selected trigger triggers a 5-second reveal: fade in (250ms), hold (5000ms), fade out (600ms).
+			// - Pinned clusters via menu checkboxes stay permanently visible (alpha = 1.0).
+			const activeNode = Node.hovered || (Node.selected as FullNode);
+			const activeHue =
+				activeNode && typeof activeNode.hue === "number"
+					? (Math.round(activeNode.hue * 100) / 100).toFixed(2)
+					: null;
+
+			const now = Date.now();
+			if (activeHue !== null) {
+				if (clusterVisualsByHue[activeHue]) {
+					clusterVisualsByHue[activeHue].lastTriggerTime = now;
+				}
+			}
+			lastActiveHue = activeHue;
+
+			for (const [hueKey, item] of Object.entries(clusterVisualsByHue)) {
+				const isPinned = pinnedClusterKeys.includes(hueKey);
+				if (isPinned) {
+					item.container.visible = true;
+					item.container.alpha = 1.0;
+					continue;
+				}
+
+				const elapsed = now - item.lastTriggerTime;
+				if (elapsed < 250) {
+					// Fade in smoothly over 250ms
+					item.container.visible = true;
+					item.container.alpha = Math.max(0.01, elapsed / 250);
+				} else if (elapsed < 5250) {
+					// Hold full visibility for 5 seconds
+					item.container.visible = true;
+					item.container.alpha = 1.0;
+				} else if (elapsed < 5850) {
+					// Fade out smoothly over 600ms
+					item.container.visible = true;
+					item.container.alpha = Math.max(
+						0,
+						1.0 - (elapsed - 5250) / 600
+					);
+				} else {
+					item.container.visible = false;
+					item.container.alpha = 0;
+				}
 			}
 
 			drawLabels(vis_nodes as FullNode[], viewport);
@@ -212,6 +270,7 @@
 			// Draw cluster backgrounds, borders, and region labels
 			const clusterContainer = new Container();
 			clusterContainer.zIndex = -10;
+			clusterVisualsByHue = {};
 
 			const hueGroups: { [hue: number]: { x: number; y: number }[] } = {};
 			for (const [id, pos] of Object.entries(
@@ -229,42 +288,51 @@
 				if (posList.length < 3) continue;
 				const cx = _.meanBy(posList, (p) => p.x);
 				const cy = _.meanBy(posList, (p) => p.y);
-				const maxDist = Math.max(
-					...posList.map((p) => Math.hypot(p.x - cx, p.y - cy))
-				);
-				const radius = maxDist + 220;
+				const dists = posList
+					.map((p) => Math.hypot(p.x - cx, p.y - cy))
+					.sort((a, b) => a - b);
+				const p95 =
+					dists[Math.floor(dists.length * 0.95)] ||
+					dists[dists.length - 1];
+				const radius = p95 + 60;
 				const hex = hslToHex(hue, 55, 50);
 
+				const groupContainer = new Container();
+				groupContainer.visible = false;
+
 				const g = new Graphics();
-				g.beginFill(hex, 0.05);
-				g.lineStyle(3, hex, 0.35);
+				g.beginFill(hex, 0.08);
+				g.lineStyle(2.5, hex, 0.5);
 				g.drawCircle(cx, cy, radius);
 				g.endFill();
-				clusterContainer.addChild(g);
+				groupContainer.addChild(g);
 
 				const clusterTitle = getClusterName(hue);
 				const label = new Text(clusterTitle.toUpperCase(), {
 					fontFamily: "Karla, Arial, sans-serif",
-					fontSize: Math.max(radius * 0.08, 38),
+					fontSize: Math.max(radius * 0.08, 32),
 					fontWeight: "700",
-					fill: hslToHex(hue, 70, 75),
+					fill: hslToHex(hue, 75, 75),
 					align: "center",
 					letterSpacing: 2,
 					dropShadow: true,
 					dropShadowColor: 0x000000,
 					dropShadowBlur: 8,
-					dropShadowDistance: 3,
+					dropShadowDistance: 2,
 				});
 				label.anchor.set(0.5, 1);
-				label.position.set(cx, cy - radius - 15);
-				label.alpha = 0.85;
-				clusterContainer.addChild(label);
+				label.position.set(cx, cy - radius - 12);
+				label.alpha = 0.9;
+				groupContainer.addChild(label);
+
+				clusterContainer.addChild(groupContainer);
+				clusterVisualsByHue[hue.toFixed(2)] = {
+					container: groupContainer,
+					lastTriggerTime: 0,
+				};
 			}
 
 			viewport.addChild(clusterContainer);
-			showClusterRegions.subscribe((show) => {
-				clusterContainer.visible = show;
-			});
 
 			for (const line of line_container.buckets) {
 				viewport.addChild(line);

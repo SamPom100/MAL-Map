@@ -1,8 +1,8 @@
 <script lang="ts">
     import AnimeView from "./AnimeView.svelte";
     import Canvas from "./Canvas.svelte";
-    import Filters from "./Filters.svelte";
     import GenreFilter from "./GenreFilter.svelte";
+    import ClusterListFilter from "./ClusterListFilter.svelte";
     import LangButton from "./LangButton.svelte";
     import Searchbar from "./Searchbar.svelte";
     import Sidebar from "./Sidebar.svelte";
@@ -12,10 +12,10 @@
         completedList,
         distance,
         endYear,
+        pinnedClusters,
         scoreThreshold,
-        selectedGenre,
+        selectedGenres,
         selected_anime,
-        showClusterRegions,
         startYear,
         username,
     } from "./store";
@@ -45,6 +45,14 @@ import { ANIME_DATA } from "./ts/types";
         )
     );
 
+    let clusterCounts: { [hueKey: string]: number } = {};
+    for (const [id, pos] of Object.entries(
+        (Layout_ as any).nodes as { [id: string]: { hue: number } }
+    )) {
+        const k = (Math.round(pos.hue * 100) / 100).toFixed(2);
+        clusterCounts[k] = (clusterCounts[k] || 0) + 1;
+    }
+
     async function handleSubmit(e: Event, input: string) {
         e.preventDefault();
         console.log(input);
@@ -70,7 +78,7 @@ import { ANIME_DATA } from "./ts/types";
             scoreThreshold: number,
             startYear: number,
             endYear: number,
-            selectedGenre: string
+            selectedGenresList: string[]
         ) {
             const metadata = node.metadata as ANIME_DATA;
             const passingScore = metadata.score >= scoreThreshold;
@@ -79,8 +87,12 @@ import { ANIME_DATA } from "./ts/types";
                 metadata.year >= startYear;
             const inRecs = node.recommendation_rank <= distance;
             const genreMatch =
-                !selectedGenre ||
-                (metadata.genres && metadata.genres.includes(selectedGenre));
+                !selectedGenresList ||
+                selectedGenresList.length === 0 ||
+                (metadata.genres &&
+                    selectedGenresList.every((g) =>
+                        metadata.genres.includes(g)
+                    ));
 
             if (passingScore && yearInRange && inRecs && genreMatch) {
                 node.brightness = 1;
@@ -97,7 +109,7 @@ import { ANIME_DATA } from "./ts/types";
                     $scoreThreshold,
                     $startYear,
                     $endYear,
-                    $selectedGenre
+                    $selectedGenres
                 );
             });
         }
@@ -106,7 +118,7 @@ import { ANIME_DATA } from "./ts/types";
         scoreThreshold.subscribe(() => updateAllBrightness(nodes));
         startYear.subscribe(() => updateAllBrightness(nodes));
         endYear.subscribe(() => updateAllBrightness(nodes));
-        selectedGenre.subscribe(() => updateAllBrightness(nodes));
+        selectedGenres.subscribe(() => updateAllBrightness(nodes));
 
         completedList.subscribe((list) => {
             const startNodes =
@@ -128,12 +140,12 @@ import { ANIME_DATA } from "./ts/types";
 <Sidebar>
     <SidebarHeader
         slot="top-header"
-        githubURL="https://github.com/platers/MAL-Map"
+        githubURL="https://github.com/SamPom100/MAL-Map"
     >
         <LangButton />
     </SidebarHeader>
     <Searchbar slot="searchbar" {selected_anime} {options} {getOptionLabel} />
-    <Filters slot="filters">
+    <div slot="filters" class="controls-container">
         <TextInput
             placeholder="MyAnimeList Username"
             title="Enter your MyAnimeList username and press the search icon"
@@ -162,42 +174,19 @@ import { ANIME_DATA } from "./ts/types";
             max={2026}
             step={1}
         />
-        <GenreFilter value={selectedGenre} genres={allGenres} />
-        <div class="setting-item mod-toggle">
-            <label class="toggle-container">
-                <input type="checkbox" bind:checked={$showClusterRegions} />
-                <span>Show Cluster Borders & Labels</span>
-            </label>
-        </div>
-    </Filters>
+        <GenreFilter value={selectedGenres} genres={allGenres} />
+        <ClusterListFilter pinned={pinnedClusters} {clusterCounts} />
+    </div>
 
     <AnimeView slot="metadata-view" />
 </Sidebar>
 
 <style lang="scss">
-    .setting-item.mod-toggle {
+    .controls-container {
+        width: 100%;
         display: flex;
-        flex-direction: row;
-        align-items: center;
-        border-top: 1px solid var(--background-modifier-border);
-        padding-top: 12px;
-        padding-bottom: 8px;
-        margin-top: 4px;
-    }
-    .toggle-container {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        color: var(--color-d-gray-10, #eee);
-        cursor: pointer;
-        user-select: none;
-        input {
-            accent-color: #ff66a5;
-            cursor: pointer;
-            width: 16px;
-            height: 16px;
-            margin: 0;
-        }
+        flex-direction: column;
+        margin-top: 8px;
+        margin-bottom: 16px;
     }
 </style>
