@@ -140,7 +140,7 @@ import { ANIME_DATA } from "./ts/types";
 <Sidebar>
     <SidebarHeader
         slot="top-header"
-        githubURL="https://github.com/SamPom100/MAL-Map"
+        githubURL="https://github.com/SamPom100/malmap"
     >
         <LangButton />
     </SidebarHeader>

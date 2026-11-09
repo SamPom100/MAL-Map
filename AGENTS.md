@@ -8,8 +8,8 @@ Operating guide and architectural invariants for autonomous agents working in `M
 
 MAL-Map is an interactive WebGL graph visualization of 3,400+ anime franchises, clustered by theme and recommendation proximity.
 
-* **Repository**: Forked from `platers/MAL-Map` to `SamPom100/MAL-Map`.
-* **Hosting**: GitHub Pages via GitHub Actions at `https://sampom100.github.io/MAL-Map/`.
+* **Repository**: Forked from `platers/MAL-Map` to `SamPom100/malmap`.
+* **Hosting**: GitHub Pages via GitHub Actions at `https://sampom100.github.io/malmap/`.
 * **External Integration**: `sampomerantz.me/malmap` redirects directly to GitHub Pages. Never commit compiled frontend bundle files into `astroPersonal`.
 
 ### Directory Layout
@@ -63,7 +63,7 @@ MAL-Map is an interactive WebGL graph visualization of 3,400+ anime franchises, 
 * **Top-Level Flat Layout:** Do not nest controls in a collapsible "Filters" accordion. Keep sliders, search bars, and categories on the main sidebar.
 * **Expanded by Default:** Both **Genres** (78 MAL genres & themes) and **Cluster Categories** (32 clusters) start expanded on page load.
 * **Filtered "Select All":** When a user searches within Genres or Cluster Categories and clicks "Select All" or "Deselect All", toggle only the filtered/matching subset, never the full master list.
-* **Header Links:** The header GitHub icon points to `https://github.com/SamPom100/MAL-Map`.
+* **Header Links:** The header GitHub icon points to `https://github.com/SamPom100/malmap`.
 
 ---
 
