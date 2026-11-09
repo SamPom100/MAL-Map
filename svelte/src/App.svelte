@@ -2,6 +2,7 @@
     import AnimeView from "./AnimeView.svelte";
     import Canvas from "./Canvas.svelte";
     import Filters from "./Filters.svelte";
+    import GenreFilter from "./GenreFilter.svelte";
     import LangButton from "./LangButton.svelte";
     import Searchbar from "./Searchbar.svelte";
     import Sidebar from "./Sidebar.svelte";
@@ -12,6 +13,7 @@
         distance,
         endYear,
         scoreThreshold,
+        selectedGenre,
         selected_anime,
         startYear,
         username,
@@ -36,6 +38,11 @@ import { ANIME_DATA } from "./ts/types";
     }
 
     let options = _.values(Metadata) as ANIME_DATA[];
+    let allGenres: string[] = _.sortBy(
+        _.uniq(
+            options.flatMap((o) => o.genres || [])
+        )
+    );
 
     async function handleSubmit(e: Event, input: string) {
         e.preventDefault();
@@ -61,7 +68,8 @@ import { ANIME_DATA } from "./ts/types";
             distance: number,
             scoreThreshold: number,
             startYear: number,
-            endYear: number
+            endYear: number,
+            selectedGenre: string
         ) {
             const metadata = node.metadata as ANIME_DATA;
             const passingScore = metadata.score >= scoreThreshold;
@@ -69,11 +77,14 @@ import { ANIME_DATA } from "./ts/types";
                 metadata.year <= endYear &&
                 metadata.year >= startYear;
             const inRecs = node.recommendation_rank <= distance;
+            const genreMatch =
+                !selectedGenre ||
+                (metadata.genres && metadata.genres.includes(selectedGenre));
 
-            if (passingScore && yearInRange && inRecs) {
+            if (passingScore && yearInRange && inRecs && genreMatch) {
                 node.brightness = 1;
             } else {
-                node.brightness = 0.5;
+                node.brightness = 0.2;
             }
         }
 
@@ -84,7 +95,8 @@ import { ANIME_DATA } from "./ts/types";
                     $distance,
                     $scoreThreshold,
                     $startYear,
-                    $endYear
+                    $endYear,
+                    $selectedGenre
                 );
             });
         }
@@ -93,6 +105,7 @@ import { ANIME_DATA } from "./ts/types";
         scoreThreshold.subscribe(() => updateAllBrightness(nodes));
         startYear.subscribe(() => updateAllBrightness(nodes));
         endYear.subscribe(() => updateAllBrightness(nodes));
+        selectedGenre.subscribe(() => updateAllBrightness(nodes));
 
         completedList.subscribe((list) => {
             const startNodes =
@@ -148,6 +161,7 @@ import { ANIME_DATA } from "./ts/types";
             max={2026}
             step={1}
         />
+        <GenreFilter value={selectedGenre} genres={allGenres} />
     </Filters>
 
     <AnimeView slot="metadata-view" />
