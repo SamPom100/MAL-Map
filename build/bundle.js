@@ -99666,7 +99666,7 @@ function create_top_header_slot(ctx) {
   sidebarheader = new SidebarHeader_svelte({
     props: {
       slot: "top-header",
-      githubURL: "https://github.com/SamPom100/MAL-Map",
+      githubURL: "https://github.com/SamPom100/malmap",
       $$slots: {
         default: [App_svelte_create_default_slot]
       },
