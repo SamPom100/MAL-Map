@@ -109,6 +109,7 @@
 		interface ClusterVisual {
 			container: Container;
 			lastTriggerTime: number;
+			isFadingIn: boolean;
 		}
 		let clusterVisualsByHue: { [hueKey: string]: ClusterVisual } = {};
 		let lastActiveHue: string | null = null;
@@ -152,7 +153,8 @@
 			}
 
 			// Dynamic cluster highlighting:
-			// - Hover/selected trigger triggers a 5-second reveal: fade in (250ms), hold (5000ms), fade out (600ms).
+			// - Hover/selected trigger triggers a 5-second reveal.
+			// - If already visible in the same cluster, maintain visibility without resetting alpha/fade-in.
 			// - Pinned clusters via menu checkboxes stay permanently visible (alpha = 1.0).
 			const activeNode = Node.hovered || (Node.selected as FullNode);
 			const activeHue =
@@ -161,9 +163,17 @@
 					: null;
 
 			const now = Date.now();
-			if (activeHue !== null) {
-				if (clusterVisualsByHue[activeHue]) {
-					clusterVisualsByHue[activeHue].lastTriggerTime = now;
+			if (activeHue !== null && clusterVisualsByHue[activeHue]) {
+				const item = clusterVisualsByHue[activeHue];
+				const elapsed = now - item.lastTriggerTime;
+				if (elapsed >= 5250 || item.lastTriggerTime === 0) {
+					// Cluster was faded out or inactive: trigger a fresh fade-in
+					item.lastTriggerTime = now;
+					item.isFadingIn = true;
+				} else {
+					// Cluster is already visible: extend timer to full hold without restarting fade-in
+					item.lastTriggerTime = now - 250;
+					item.isFadingIn = false;
 				}
 			}
 			lastActiveHue = activeHue;
@@ -176,17 +186,24 @@
 					continue;
 				}
 
+				if (item.lastTriggerTime === 0) {
+					item.container.visible = false;
+					item.container.alpha = 0;
+					continue;
+				}
+
 				const elapsed = now - item.lastTriggerTime;
-				if (elapsed < 250) {
-					// Fade in smoothly over 250ms
+				if (elapsed < 250 && item.isFadingIn) {
+					// Smooth initial fade in over 250ms
 					item.container.visible = true;
 					item.container.alpha = Math.max(0.01, elapsed / 250);
 				} else if (elapsed < 5250) {
-					// Hold full visibility for 5 seconds
+					// Hold full visibility smoothly for 5 seconds
 					item.container.visible = true;
 					item.container.alpha = 1.0;
+					item.isFadingIn = false;
 				} else if (elapsed < 5850) {
-					// Fade out smoothly over 600ms
+					// Smooth fade out over 600ms
 					item.container.visible = true;
 					item.container.alpha = Math.max(
 						0,
@@ -195,6 +212,7 @@
 				} else {
 					item.container.visible = false;
 					item.container.alpha = 0;
+					item.isFadingIn = false;
 				}
 			}
 
@@ -329,6 +347,7 @@
 				clusterVisualsByHue[hue.toFixed(2)] = {
 					container: groupContainer,
 					lastTriggerTime: 0,
+					isFadingIn: false,
 				};
 			}
 
