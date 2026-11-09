@@ -6,9 +6,64 @@ import { ANIME_DATA, ANIME_DICT } from '../svelte/src/ts/types';
 
 const KEY = 'e0e691a27a61d8cca4d3446774022c20'; // please be responsible
 
+export async function getAniListPopularIds(pages = 60): Promise<number[]> {
+    console.log(`Getting ids from AniList (top ${pages * 50} shows)`);
+    const ids: number[] = [];
+    const bar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar.start(pages, 0);
+    for (let page = 1; page <= pages; page++) {
+        bar.increment();
+        try {
+            const res = await fetch('https://graphql.anilist.co', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'User-Agent': 'Mozilla/5.0'
+                },
+                signal: (AbortSignal as any).timeout?.(10000),
+                body: JSON.stringify({
+                    query: `query {
+                        Page(page: ${page}, perPage: 50) {
+                            pageInfo { hasNextPage }
+                            media(sort: POPULARITY_DESC, type: ANIME) {
+                                idMal
+                            }
+                        }
+                    }`
+                })
+            });
+            if (res.status === 429) {
+                const retryAfter = parseInt(res.headers.get('Retry-After') || '5', 10);
+                console.log(`AniList rate limited at page ${page}, waiting ${retryAfter}s...`);
+                await new Promise(resolve => setTimeout(resolve, (retryAfter + 1) * 1000));
+                page--;
+                continue;
+            }
+            const json = await res.json();
+            const mediaList = json?.data?.Page?.media || [];
+            for (const item of mediaList) {
+                if (item?.idMal) {
+                    ids.push(item.idMal);
+                }
+            }
+            if (json?.data?.Page?.pageInfo && json.data.Page.pageInfo.hasNextPage === false) {
+                break;
+            }
+        } catch (e) {
+            console.error(`AniList page ${page} error:`, e);
+        }
+        await new Promise(resolve => setTimeout(resolve, 800));
+    }
+    bar.stop();
+    const unique = _.uniq(ids);
+    console.log(`Discovered ${unique.length} MAL IDs from AniList`);
+    return unique;
+}
+
 export async function getIds() {
     console.log('Getting ids from MAL');
-    const ids = [];
+    const ids: number[] = [];
     for (let i = 0; i < 10; i++) {
         const url = `https://api.myanimelist.net/v2/anime/ranking?ranking_type=bypopularity&limit=500&offset=${i * 500}`;
         const response = await fetch(url, {
@@ -22,10 +77,14 @@ export async function getIds() {
         }
         await new Promise(resolve => setTimeout(resolve, 600));
     }
-    // dedup ids
-    const uniqueIds = _.uniq(ids);
+    const malIds = _.uniq(ids);
 
-    return uniqueIds;
+    const aniListIds = await getAniListPopularIds(60);
+    fs.writeFileSync('data/ids-anilist.json', JSON.stringify(aniListIds, null, 2));
+
+    const combined = _.uniq([...malIds, ...aniListIds]);
+    console.log(`Total unique IDs combined: ${combined.length} (MAL: ${malIds.length}, AniList: ${aniListIds.length})`);
+    return combined;
 }
 
 type ANILIST_RECS = {
@@ -62,7 +121,7 @@ export async function storeAniListMetadata(ids: number[] = [], filename = 'data/
                     signal: (AbortSignal as any).timeout?.(10000),
                     body: JSON.stringify({
                         query: `{
-                            Media(idMal: ${id}) {
+                            Media(idMal: ${id}, type: ANIME) {
                               recommendations(page: ${i}) {
                                 nodes {
                                   mediaRecommendation {
@@ -76,6 +135,12 @@ export async function storeAniListMetadata(ids: number[] = [], filename = 'data/
                         `
                     })
                 });
+                if (res.status === 429) {
+                    const retryAfter = parseInt(res.headers.get('Retry-After') || '5', 10);
+                    await new Promise(resolve => setTimeout(resolve, (retryAfter + 1) * 1000));
+                    i--;
+                    continue;
+                }
                 const json = await res.json();
                 const nodes = json?.data?.Media?.recommendations?.nodes
                     ?.filter(n => n?.mediaRecommendation?.idMal) || [];
@@ -160,17 +225,21 @@ export async function storeMetadata(ids: number[] = [], filename = 'data/metadat
     return metadata;
 }
 
-function filterMetadata(metadata: ANIME_DICT): ANIME_DICT {
+function filterMetadata(metadata: ANIME_DICT, anilistIds: Set<number> = new Set()): ANIME_DICT {
     let filtered = {};
+    const allowedTypes = ['tv', 'ona', 'movie', 'ova', 'tv_special'];
     for (const id in metadata) {
         const show = metadata[id];
-        if (show.score && ['tv'].includes(show.type) && !show.nsfw) {
+        if (show.score && allowedTypes.includes(show.type) && !show.nsfw) {
             filtered[id] = show;
         }
     }
-    // only keep most popular shows
+    // keep popular shows from MAL or shows discovered via AniList popularity
     const keys = Object.keys(filtered)
-        .filter(id => filtered[id].popularity < 4000)
+        .filter(id => {
+            const numId = parseInt(id);
+            return filtered[id].popularity < 5000 || anilistIds.has(numId);
+        });
     return _.pick(filtered, keys) as ANIME_DICT;
 }
 
@@ -281,12 +350,12 @@ function mergeSeasons(data: ANIME_DICT): ANIME_DICT {
     }
 }
 
-export function processMetadata(metadata, anilist_metadata: ANILIST_RECS) {
+export function processMetadata(metadata, anilist_metadata: ANILIST_RECS, anilist_ids: number[] = []) {
     const data = augmentMetadata(_.mapValues(metadata, parseMetadata), anilist_metadata);
     console.log(`${_.size(data)} shows have metadata`);
     const merged = mergeSeasons(data);
     console.log(`${_.size(merged)} shows after merging seasons`);
-    const filtered = filterMetadata(merged);
+    const filtered = filterMetadata(merged, new Set(anilist_ids));
     console.log(`${_.size(filtered)} shows filtered`);
 
     fs.writeFileSync('data/min_metadata.json', JSON.stringify(filtered, null, 2));

@@ -6,6 +6,7 @@ import { ANIME_DICT } from "../svelte/src/ts/types";
 const fs = require('fs');
 const MAL_METADATA_FILENAME = 'data/metadata.json';
 const ANILIST_METADATA_FILENAME = 'data/metadata-anilist.json';
+const ANILIST_IDS_FILENAME = 'data/ids-anilist.json';
 
 main();
 
@@ -17,6 +18,7 @@ async function main() {
         if (process.argv[2] === 'reset') {
             fs.writeFileSync(MAL_METADATA_FILENAME, '{}');
             fs.writeFileSync(ANILIST_METADATA_FILENAME, '{}');
+            fs.writeFileSync(ANILIST_IDS_FILENAME, '[]');
         }
         await storeMetadata(ids);
         await storeAniListMetadata(ids);
@@ -25,7 +27,10 @@ async function main() {
     // Load metadata
     const metadata_json = JSON.parse(fs.readFileSync(MAL_METADATA_FILENAME).toString());
     const anilist_metadata_json = JSON.parse(fs.readFileSync(ANILIST_METADATA_FILENAME).toString());
-    let metadata: ANIME_DICT = processMetadata(metadata_json, anilist_metadata_json);
+    const anilist_ids: number[] = fs.existsSync(ANILIST_IDS_FILENAME)
+        ? JSON.parse(fs.readFileSync(ANILIST_IDS_FILENAME).toString())
+        : [];
+    let metadata: ANIME_DICT = processMetadata(metadata_json, anilist_metadata_json, anilist_ids);
 
     // Get edges
     const edges = storeEdges(metadata);
