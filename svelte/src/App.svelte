@@ -15,6 +15,7 @@
         scoreThreshold,
         selectedGenre,
         selected_anime,
+        showClusterRegions,
         startYear,
         username,
     } from "./store";
@@ -162,10 +163,41 @@ import { ANIME_DATA } from "./ts/types";
             step={1}
         />
         <GenreFilter value={selectedGenre} genres={allGenres} />
+        <div class="setting-item mod-toggle">
+            <label class="toggle-container">
+                <input type="checkbox" bind:checked={$showClusterRegions} />
+                <span>Show Cluster Borders & Labels</span>
+            </label>
+        </div>
     </Filters>
 
     <AnimeView slot="metadata-view" />
 </Sidebar>
 
 <style lang="scss">
+    .setting-item.mod-toggle {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        border-top: 1px solid var(--background-modifier-border);
+        padding-top: 12px;
+        padding-bottom: 8px;
+        margin-top: 4px;
+    }
+    .toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--color-d-gray-10, #eee);
+        cursor: pointer;
+        user-select: none;
+        input {
+            accent-color: #ff66a5;
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            margin: 0;
+        }
+    }
 </style>

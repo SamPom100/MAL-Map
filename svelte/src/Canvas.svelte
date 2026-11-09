@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import { Application, Graphics, Point } from "pixi.js";
+	import { Application, Container, Graphics, Point, Text } from "pixi.js";
 	import _ from "lodash";
 	import { FullNode, Node, NODE_RADIUS } from "./ts/node";
 	import { Edge, LineContainer } from "./ts/edge";
 	import { Viewport } from "pixi-viewport";
 	import { drawImages, drawLabels } from "./ts/draw";
 	import { Layout } from "../../data-collection/layout";
-	import { params_dict, updateHashParams } from "./ts/base_utils";
+	import { hslToHex, params_dict, updateHashParams } from "./ts/base_utils";
 	import { Writable } from "svelte/store";
 	import { Cluster_Nodes } from "./ts/utils";
 	import { METADATA_DICT } from "./ts/base_types";
+	import { getClusterName } from "./ts/cluster_names";
+	import { showClusterRegions } from "./store";
 
 	let canvas: HTMLCanvasElement;
 	export let onInit: (
@@ -206,6 +208,63 @@
 				return new Edge(node_map[e[0]], node_map[e[1]], e[2]);
 			});
 			line_container.setEdges(edges);
+
+			// Draw cluster backgrounds, borders, and region labels
+			const clusterContainer = new Container();
+			clusterContainer.zIndex = -10;
+
+			const hueGroups: { [hue: number]: { x: number; y: number }[] } = {};
+			for (const [id, pos] of Object.entries(
+				layout_json.nodes as {
+					[id: string]: { x: number; y: number; hue: number };
+				}
+			)) {
+				const h = Math.round(pos.hue * 100) / 100;
+				hueGroups[h] = hueGroups[h] || [];
+				hueGroups[h].push(pos);
+			}
+
+			for (const [hueStr, posList] of Object.entries(hueGroups)) {
+				const hue = parseFloat(hueStr);
+				if (posList.length < 3) continue;
+				const cx = _.meanBy(posList, (p) => p.x);
+				const cy = _.meanBy(posList, (p) => p.y);
+				const maxDist = Math.max(
+					...posList.map((p) => Math.hypot(p.x - cx, p.y - cy))
+				);
+				const radius = maxDist + 220;
+				const hex = hslToHex(hue, 55, 50);
+
+				const g = new Graphics();
+				g.beginFill(hex, 0.05);
+				g.lineStyle(3, hex, 0.35);
+				g.drawCircle(cx, cy, radius);
+				g.endFill();
+				clusterContainer.addChild(g);
+
+				const clusterTitle = getClusterName(hue);
+				const label = new Text(clusterTitle.toUpperCase(), {
+					fontFamily: "Karla, Arial, sans-serif",
+					fontSize: Math.max(radius * 0.08, 38),
+					fontWeight: "700",
+					fill: hslToHex(hue, 70, 75),
+					align: "center",
+					letterSpacing: 2,
+					dropShadow: true,
+					dropShadowColor: 0x000000,
+					dropShadowBlur: 8,
+					dropShadowDistance: 3,
+				});
+				label.anchor.set(0.5, 1);
+				label.position.set(cx, cy - radius - 15);
+				label.alpha = 0.85;
+				clusterContainer.addChild(label);
+			}
+
+			viewport.addChild(clusterContainer);
+			showClusterRegions.subscribe((show) => {
+				clusterContainer.visible = show;
+			});
 
 			for (const line of line_container.buckets) {
 				viewport.addChild(line);
