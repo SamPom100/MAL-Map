@@ -35,15 +35,20 @@ type ANILIST_RECS = {
 }
 
 export async function storeAniListMetadata(ids: number[] = [], filename = 'data/metadata-anilist.json') {
-    const metadata: ANILIST_RECS = JSON.parse(fs.readFileSync(filename).toString());
+    const metadata: ANILIST_RECS = fs.existsSync(filename) ? JSON.parse(fs.readFileSync(filename).toString()) : {};
     console.log(`${_.size(metadata)} shows already have anilist metadata out of ${ids.length}`);
+    const toFetch = ids.filter(id => !metadata[id]);
     const bar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    bar.start(ids.length - _.size(metadata), 0);
+    if (toFetch.length > 0) {
+        bar.start(toFetch.length, 0);
+    }
     for (const id of ids) {
         if (metadata[id]) {
             continue;
         }
-        bar.increment();
+        if (toFetch.length > 0) {
+            bar.increment();
+        }
 
         try {
             metadata[id] = {};
@@ -54,6 +59,7 @@ export async function storeAniListMetadata(ids: number[] = [], filename = 'data/
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
                     },
+                    signal: (AbortSignal as any).timeout?.(10000),
                     body: JSON.stringify({
                         query: `{
                             Media(idMal: ${id}) {
@@ -71,8 +77,8 @@ export async function storeAniListMetadata(ids: number[] = [], filename = 'data/
                     })
                 });
                 const json = await res.json();
-                const nodes = json.data.Media.recommendations.nodes
-                    .filter(n => n.mediaRecommendation?.idMal);
+                const nodes = json?.data?.Media?.recommendations?.nodes
+                    ?.filter(n => n?.mediaRecommendation?.idMal) || [];
                 for (const node of nodes) {
                     const rec = node.mediaRecommendation.idMal;
                     if (node.rating < 1) {
@@ -101,21 +107,28 @@ export async function storeAniListMetadata(ids: number[] = [], filename = 'data/
             fs.writeFileSync(filename, JSON.stringify(metadata, null, 2));
         }
     }
-    bar.stop();
+    if (toFetch.length > 0) {
+        bar.stop();
+    }
     fs.writeFileSync(filename, JSON.stringify(metadata, null, 2));
     return metadata;
 }
 
 export async function storeMetadata(ids: number[] = [], filename = 'data/metadata.json') {
-    const metadata = JSON.parse(fs.readFileSync(filename).toString());
+    const metadata = fs.existsSync(filename) ? JSON.parse(fs.readFileSync(filename).toString()) : {};
     console.log(`${_.size(metadata)} shows already have metadata out of ${ids.length}`);
+    const toFetch = ids.filter(id => !metadata[id]);
     const bar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    bar.start(ids.length - _.size(metadata), 0);
+    if (toFetch.length > 0) {
+        bar.start(toFetch.length, 0);
+    }
     for (const id of ids) {
         if (metadata[id]) {
             continue;
         }
-        bar.increment();
+        if (toFetch.length > 0) {
+            bar.increment();
+        }
 
         try {
             const params = 'title,alternative_titles,num_list_users,media_type,start_season,nsfw,synopsis,score,genres,rank,popularity,main_picture,related_anime,mean,recommendations';
@@ -123,11 +136,14 @@ export async function storeMetadata(ids: number[] = [], filename = 'data/metadat
             const response = await fetch(url, {
                 headers: {
                     'X-MAL-CLIENT-ID': KEY,
-                }
+                },
+                signal: (AbortSignal as any).timeout?.(10000),
             });
             // console.log(response)
             const json = await response.json();
-            metadata[id] = json;
+            if (json && json.id) {
+                metadata[id] = json;
+            }
         } catch (e) {
             console.log(e, id);
         }
@@ -137,7 +153,9 @@ export async function storeMetadata(ids: number[] = [], filename = 'data/metadat
             fs.writeFileSync(filename, JSON.stringify(metadata, null, 2));
         }
     }
-    bar.stop();
+    if (toFetch.length > 0) {
+        bar.stop();
+    }
     fs.writeFileSync(filename, JSON.stringify(metadata, null, 2));
     return metadata;
 }

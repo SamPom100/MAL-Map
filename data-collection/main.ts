@@ -10,11 +10,14 @@ const ANILIST_METADATA_FILENAME = 'data/metadata-anilist.json';
 main();
 
 async function main() {
-    // If reset flag, delete existing metadata and pull it again. Takes hours.
-    if (process.argv.length === 3 && process.argv[2] === 'reset') {
+    // If reset or update flag, pull latest data.
+    // 'reset' wipes existing data; 'update' incrementally fetches new top shows.
+    if (process.argv.length === 3 && (process.argv[2] === 'reset' || process.argv[2] === 'update')) {
         const ids = await getIds();
-        fs.writeFileSync(MAL_METADATA_FILENAME, '{}');
-        fs.writeFileSync(ANILIST_METADATA_FILENAME, '{}');
+        if (process.argv[2] === 'reset') {
+            fs.writeFileSync(MAL_METADATA_FILENAME, '{}');
+            fs.writeFileSync(ANILIST_METADATA_FILENAME, '{}');
+        }
         await storeMetadata(ids);
         await storeAniListMetadata(ids);
     }

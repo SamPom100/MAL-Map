@@ -12,3 +12,5 @@ clusters.json
 layout.json
 
 build/
+venv/
+.venv/

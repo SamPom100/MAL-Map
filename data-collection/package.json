@@ -5,6 +5,7 @@
     "build": "tsc *.ts",
     "dev": "tsc-watch *.ts",
     "layout": "npm run build && node main.js",
+    "update": "npm run build && node main.js update",
     "cached": "npm run build && node main.js reset"
   },
   "author": "",

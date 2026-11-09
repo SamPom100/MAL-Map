@@ -186,7 +186,8 @@ export async function createCluster(edges: Edge[], edgePath='data/edges.txt', cl
 
     console.log('Creating clusters...');
     let start = Date.now();
-    await execShellCommand(`python3 cluster.py ${edgePath} ${clusterPath}`);
+    const python = fs.existsSync('./venv/bin/python3') ? './venv/bin/python3' : (process.env.PYTHON || 'python3');
+    await execShellCommand(`${python} cluster.py ${edgePath} ${clusterPath}`);
     console.log(`Clustering took ${(Date.now() - start) / 1000}s`);
 
     // Process clusters
