@@ -59,12 +59,35 @@
 		const viewport = new Viewport({
 			interaction: app.renderer.plugins.interaction,
 			stopPropagation: true,
+			passiveWheel: false,
 		});
 		viewport.sortableChildren = true;
 		viewport.moveCenter(0, 0);
 
-		viewport.drag().pinch().wheel().decelerate();
+		viewport
+			.drag()
+			.pinch()
+			.wheel({
+				trackpadPinch: true,
+				wheelZoom: true,
+				percent: 0.1,
+			})
+			.decelerate();
 		(window as any).viewport = viewport;
+
+		// Prevent browser page zoom from trackpad pinch or Ctrl+wheel
+		const onWheel = (e: WheelEvent) => {
+			if (e.ctrlKey) {
+				e.preventDefault();
+			}
+		};
+		window.addEventListener("wheel", onWheel, { passive: false });
+
+		const onGesture = (e: Event) => e.preventDefault();
+		window.addEventListener("gesturestart", onGesture);
+		window.addEventListener("gesturechange", onGesture);
+		window.addEventListener("gestureend", onGesture);
+
 		window.addEventListener("resize", () => {
 			viewport.resize(window.innerWidth, window.innerHeight);
 		});
@@ -249,6 +272,10 @@
 </div>
 
 <style>
+	canvas {
+		touch-action: none;
+		display: block;
+	}
 	.zoom-options {
 		position: fixed;
 		bottom: 10px;
