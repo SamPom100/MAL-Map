@@ -50,9 +50,17 @@ function displayTitle(metadata: any) {
 import Anime from "../../../data-collection/data/min_metadata.json";
 import Clusters_ from "../../../data-collection/data/clusters.json";
 import { ANIME_DATA } from "./types";
-export const Metadata = _.mapValues(Anime, (metadata: any) => Object.assign(new ANIME_DATA(), metadata, {
-    display_title: displayTitle(metadata),
-}));
+export const Metadata = _.mapValues(Anime, (metadata: any) => {
+    let picture = metadata.picture || "";
+    if (picture.includes("myanimelist.net") && !picture.includes("cdn.myanimelist.net")) {
+        picture = picture.replace("https://myanimelist.net/", "https://cdn.myanimelist.net/")
+                         .replace("http://myanimelist.net/", "https://cdn.myanimelist.net/");
+    }
+    return Object.assign(new ANIME_DATA(), metadata, {
+        display_title: displayTitle(metadata),
+        picture: picture,
+    });
+});
 export const Clusters = Cluster.fromJSON(Clusters_);
 export const Tier: { [id: number]: number } = getTiers(Clusters, Metadata);
 export const Cluster_Nodes = Clusters.toNodeDict();

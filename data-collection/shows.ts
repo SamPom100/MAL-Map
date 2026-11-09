@@ -175,12 +175,17 @@ function filterMetadata(metadata: ANIME_DICT): ANIME_DICT {
 }
 
 function parseMetadata(json): ANIME_DATA {
+    let pic = json.main_picture?.medium;
+    if (pic && pic.includes("myanimelist.net") && !pic.includes("cdn.myanimelist.net")) {
+        pic = pic.replace("https://myanimelist.net/", "https://cdn.myanimelist.net/")
+                 .replace("http://myanimelist.net/", "https://cdn.myanimelist.net/");
+    }
     return Object.assign(new ANIME_DATA(), {
         id: json.id,
         title: json.title,
         englishTitle: json.alternative_titles?.en,
         url: 'https://myanimelist.net/anime/' + json.id,
-        picture: json.main_picture?.medium,
+        picture: pic,
         synopsis: json.synopsis,
         type: json.media_type,
         score: json.mean,

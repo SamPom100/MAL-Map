@@ -64,6 +64,7 @@
 		viewport.moveCenter(0, 0);
 
 		viewport.drag().pinch().wheel().decelerate();
+		(window as any).viewport = viewport;
 		window.addEventListener("resize", () => {
 			viewport.resize(window.innerWidth, window.innerHeight);
 		});
