@@ -44,27 +44,3 @@ jobs:
           branch: gh-pages
           folder: svelte/public
           clean: true
-
-      - name: Update Astro Personal Site
-        env:
-          ASTRO_DEPLOY_KEY: ${{ secrets.ASTRO_DEPLOY_KEY }}
-        run: |
-          if [ -n "$ASTRO_DEPLOY_KEY" ]; then
-            echo "Syncing bundles directly to astroPersonal..."
-            mkdir -p ~/.ssh
-            echo "$ASTRO_DEPLOY_KEY" > ~/.ssh/id_ed25519
-            chmod 600 ~/.ssh/id_ed25519
-            ssh-keyscan github.com >> ~/.ssh/known_hosts
-            git clone git@github.com:SamPom100/astroPersonal.git /tmp/astroPersonal
-            cp svelte/public/build/bundle.js /tmp/astroPersonal/public/malmap/bundle.js
-            cp svelte/public/build/bundle.css /tmp/astroPersonal/public/malmap/bundle.css
-            cd /tmp/astroPersonal
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add public/malmap/
-            if git commit -m "chore(malmap): auto-sync bundle from MAL-Map [skip ci]"; then
-              git push origin main
-            fi
-          else
-            echo "ASTRO_DEPLOY_KEY not set. GitHub Pages deployment completed."
-          fi
